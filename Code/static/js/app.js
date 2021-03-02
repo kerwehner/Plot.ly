@@ -1,107 +1,125 @@
-function buildPlots(singleId) {
-    // Using d3 to Read in samples.json
-    d3.json("samples.json").then((importedData) => {
-        // Data
-        var data = importedData;
+// get sample data (values, ids, labels for horizontal bar chart and bubble chart)
+function buildPlots(sampleID) {
+    d3.json("samples.json").then((data) => {
+        console.log(data);
 
-        // Array of Metadata & Samples
-        var metadata = data.metadata;
-        var samples = data.samples;
+        // filter data by test subject ID and display filtered data
+        const sampleName = data.samples.filter(row => row.id === sampleID);
+        console.log(sampleName);
 
-       // Filter Metadata
-       var filterMetadata = metadata.filter(metaObject => metaObject.id == singleId)[0];
+        const otu = sampleName[0].otu_ids
+        console.log(otu);
 
-        // Selecting Id
-       var demographicInfo = d3.select("#sample-metadata");
-       // Clearing Any Data
-       demographicInfo.html("");
-       // Creating Table
-        Object.entries(filterMetadata).forEach((key) => {
-            demographicInfo.append("h5").text(key[0].toUpperCase() + ": " + key[1] + "\n");
-        });
+        // get first 10 samples and reverse order
+        const sampleData = sampleName[0].sample_values.slice(0,10)
+        const sample_values = sampleData.sort((firstNum, secondNum) => secondNum - firstNum).reverse();
+        console.log(sample_values);
 
-        // Filter Samples
-        var filterSamples = samples.filter(sampleObject => sampleObject.id == singleId)[0];
+        const otuData = sampleName[0].otu_ids.slice(0,10);
+        const otuSort = otuData.sort((firstNum, secondNum) => secondNum - firstNum).reverse();
 
-        // Seeking Sample Values, OTU_Ids, and OTU_Label
-        var sampleValues = filterSamples.sample_values;
-        var OTU_Ids = filterSamples.otu_ids;
-        var OTU_Labels = filterSamples.otu_labels;
+        // add "OTU" to ID numbers
+        const otu_ids = otuSort.map(data => "OTU" + " " + data);
+        console.log(otu_ids);
+    
+        const otu_labels = sampleName[0].otu_labels.slice(0,10);
+        console.log(otu_labels);
 
-        // The Plotly Bar Plot Only Needs the Top 10 Samples
-        // Also, we Must Use .reverse Method to Account for Plotly's Defaults
-        var top10Samples = sampleValues.slice(0, 10).reverse();
-        var top10Otus = OTU_Ids.slice(0, 10).reverse();
-        var top10Labels = OTU_Labels.slice(0, 10).reverse();
-     
-        // Using .map Methis to Return Array of OTU Ids
-        var top10OtuIds = top10Otus.map(d => "OTU " + d);
-
-        // Create Trace for Bar Plot
-        var trace = {
-            x: top10Samples,
-            y: top10OtuIds,
-            text: top10Labels,
+        // horizontal bar chart
+        const barhChart = [{
+            x: sample_values,
+            y: otu_ids,
+            text: otu_labels,
             type: "bar",
             orientation: "h"
-        }
-
-        // Create Trace1 for Bubble Chart
-        var trace1 = {
-            x: OTU_Ids,
-            y: sampleValues,
-            marker: sampleValues,
-            text: OTU_Labels,
+        }];
+    
+        const layout = {
+            title: "Top 10 OTUs per Test Subject",
+            margin: {
+                l: 100,
+                r: 100,
+                t: 100,
+                b: 100
+            },
+            xaxis: {title: "Sample Values"},
+            width: 1000
+        };
+    
+        Plotly.newPlot("bar", barhChart, layout);
+    
+        // bubble chart
+        const bubbleChart = [{
+            x: sampleName[0].otu_ids,
+            y: sampleName[0].sample_values,
+            text: sampleName[0].otu_labels,
             mode: "markers",
             marker: {
-                color: OTU_Ids,
-                colorscale: 'Earth',
-                size: sampleValues
-            }
-        }
-        // Layout for Trace1
-        var layout = {
-            showlegend: false,
-            height: 600,
-            width: 930,
-            xaxis: {
-                title: {
-                    text: 'OTU Id'
-                }
-            }
-          }
+                size: sampleName[0].sample_values,
+                color: sampleName[0].otu_ids
+            },
+        }];
+    
+        const bubbleLayout = {
+            xaxis: {title: "OTU ID"},
+            yaxis: {title: "Sample Values"},
+            height: 500,
+            width: 1200
+        };
+    
+        Plotly.newPlot("bubble", bubbleChart, bubbleLayout);
 
-        var chartData = [trace];
-        var chartData1 = [trace1];
 
-        Plotly.newPlot("bar", chartData);
-        Plotly.newPlot("bubble", chartData1, layout);
-    });
+});
+
 }
 
-// Calling Function to Build Plots
-buildPlots();
+// get metadata for demographic info box
+function getMetadata(sampleID) {
 
+    d3.json("samples.json").then((data) => {
+        console.log(sampleID);
 
-// Function to Populate Dropdown Menu
-function populate() {
-    d3.json("samples.json").then((importedData) => {
-        var data = importedData;
-        // Selecting Id
-        var dropDownMenu = d3.select("#selDataset")
-        data.names.forEach((value) => {
-            // Appending Option Tag to HTML
-            var option = dropDownMenu.append("option");
-            //Getting and Setting the Value
-            option.text(value).property("value", value);
+        // get demographic data based on ID
+        const results = data.metadata.filter(row => row.id == sampleID);
+        console.log(results);
+
+        // grab the html id for the dropdown menu
+        const demoInfo = d3.select("#sample-metadata");
+        demoInfo.html("");
+
+        // iterate through results to get key and value pairs
+        Object.entries(results[0]).forEach(([key, value]) => {
+            demoInfo.append("h5").text(`${key}: ${value}`);
         });
     });
 }
 
-// Calling Function to Populate Dropdown Menu
-populate();
-
-// Function to Call buildPlots
-function optionChanged(name) {
-    buildPlots(name);
+// function to updata plots and demographic info with new data based on test subject ID selection
+function updateData(newData) {
+    
+    buildPlots(newData);
+    getMetadata(newData);
 }
+
+// initialize default data
+function init() {
+
+    const dropdownMenu = d3.select("#selDataset");
+
+    d3.json("samples.json").then((sampleData) => {
+        console.log(sampleData);
+
+        // iterate through names array and append values to dropdown
+        sampleData.names.forEach(sample => {
+            dropdownMenu.append("option").text(sample).property("value");
+        });
+
+        // first sample to build initial plot
+        buildPlots(sampleData.names[0]);
+        getMetadata(sampleData.names[0]);
+
+    });
+}
+
+init();
